@@ -539,18 +539,22 @@ async function renderDashboard() {
        </div>`;
     return;
   }
-
+//gin change mo ang indicator na check to svg ddi adto
   document.getElementById('dashSubjectList').innerHTML = mySubjects.map(sub => {
     const evaluated = myEvals.some(e => e.subjectId === sub.docId);
     return `
       <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f1f5f9; gap:12px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:11px;">
           <div style="width:36px; height:36px; border-radius:9px; background:${evaluated ? '#f0fdf4' : '#f1f5f9'}; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">
-            ${evaluated ? '✅' : '📖'}
+            ${evaluated ? '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path fill-rule="evenodd" clip-rule="evenodd" d="M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12ZM16.0303 8.96967C16.3232 9.26256 16.3232 9.73744 16.0303 10.0303L11.0303 15.0303C10.7374 15.3232 10.2626 15.3232 9.96967 15.0303L7.96967 13.0303C7.67678 12.7374 7.67678 12.2626 7.96967 11.9697C8.26256 11.6768 8.73744 11.6768 9.03033 11.9697L10.5 13.4393L12.7348 11.2045L14.9697 8.96967C15.2626 8.67678 15.7374 8.67678 16.0303 8.96967Z" fill="#267d57"></path> </g></svg>'
+               : 
+               '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#50be7a"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path fill-rule="evenodd" clip-rule="evenodd" d="M3.75 8C3.75 5.37665 5.87665 3.25 8.5 3.25H18.5C19.4665 3.25 20.25 4.0335 20.25 5V20C20.25 20.9665 19.4665 21.75 18.5 21.75H7.5C5.42893 21.75 3.75 20.0711 3.75 18V8ZM18.75 5V14.25H7.5C6.6558 14.25 5.87675 14.529 5.25 14.9997V8C5.25 6.20507 6.70507 4.75 8.5 4.75H11.7079C11.4446 6.73154 11.4683 8.74229 11.7794 10.72L11.8418 11.1166C11.8865 11.4006 12.0896 11.6341 12.3648 11.7176C12.6399 11.8012 12.9385 11.7201 13.1336 11.5089L14.5 10.0297L15.8664 11.5089C16.0615 11.7201 16.3601 11.8012 16.6353 11.7176C16.9104 11.6341 17.1135 11.4006 17.1582 11.1166L17.2206 10.72C17.5318 8.74228 17.5554 6.73154 17.2921 4.75H18.5C18.6381 4.75 18.75 4.86193 18.75 5ZM15.7779 4.75H13.2221C13.005 6.26418 12.9688 7.79819 13.1139 9.31967L13.7654 8.61431C14.1614 8.1857 14.8386 8.1857 15.2346 8.61431L15.8861 9.31967C16.0312 7.79819 15.995 6.26418 15.7779 4.75ZM7.5 15.75H18.75V20C18.75 20.1381 18.6381 20.25 18.5 20.25H7.5C6.25736 20.25 5.25 19.2426 5.25 18C5.25 16.7574 6.25736 15.75 7.5 15.75Z" fill="#50be7a"></path> </g></svg>'}
+
+            
           </div>
           <div>
             <div style="font-weight:700; font-size:0.86rem;">${sub.name}</div>
-            <div style="font-size:0.72rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">${sub.code}</div>
+            <div style="font-size:0.72rem; color:var(--muted); font-family:'Sora',monospace;">${sub.code}</div>
           </div>
         </div>
         <span class="badge ${evaluated ? 'badge-success' : 'badge-warning'}">
@@ -837,11 +841,11 @@ async function renderHistory() {
           <div class="history-item sv-clickable" role="button" tabindex="0"
                onclick="openSubmissionView('${key}')" onkeydown="_svKey(event,'${key}')"
                aria-label="View your ratings for ${escapeHtml(sub ? sub.name : 'this subject')}">
-            <div class="history-dot">📝</div>
+            <div class="history-dot"><svg width="188px" height="188px" viewBox="0 0 24.00 24.00" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#21ba40" stroke-width="0.00024000000000000003"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="0.144"></g><g id="SVGRepo_iconCarrier"> <path fill-rule="evenodd" clip-rule="evenodd" d="M9.94531 1.25H14.0551C15.4227 1.24998 16.525 1.24996 17.3919 1.36652C18.292 1.48754 19.0499 1.74643 19.6518 2.34835C20.2538 2.95027 20.5126 3.70814 20.6337 4.60825C20.7502 5.47522 20.7502 6.57754 20.7502 7.94513V16.0549C20.7502 17.4225 20.7502 18.5248 20.6337 19.3918C20.5126 20.2919 20.2538 21.0497 19.6518 21.6517C19.0499 22.2536 18.292 22.5125 17.3919 22.6335C16.525 22.75 15.4226 22.75 14.0551 22.75H9.94532C8.57773 22.75 7.4754 22.75 6.60844 22.6335C5.70833 22.5125 4.95045 22.2536 4.34854 21.6517C3.74662 21.0497 3.48773 20.2919 3.36671 19.3918C3.32801 19.1039 3.30216 18.7902 3.2849 18.4494C3.24582 18.326 3.23821 18.1912 3.26895 18.0568C3.25016 17.4649 3.25017 16.7991 3.25019 16.0549V7.94513C3.25017 6.57754 3.25015 5.47522 3.36671 4.60825C3.48773 3.70814 3.74662 2.95027 4.34854 2.34835C4.95045 1.74643 5.70833 1.48754 6.60843 1.36652C7.4754 1.24996 8.57772 1.24998 9.94531 1.25ZM4.77694 18.2491C4.79214 18.6029 4.81597 18.914 4.85333 19.1919C4.95199 19.9257 5.13243 20.3142 5.4092 20.591C5.68596 20.8678 6.07453 21.0482 6.80831 21.1469C7.56366 21.2484 8.56477 21.25 10.0002 21.25H14.0002C15.4356 21.25 16.4367 21.2484 17.1921 21.1469C17.9258 21.0482 18.3144 20.8678 18.5912 20.591C18.8679 20.3142 19.0484 19.9257 19.147 19.1919C19.2299 18.5756 19.2462 17.7958 19.2494 16.75H13.7502V19.5309C13.7502 19.5396 13.7502 19.5485 13.7502 19.5578C13.7504 19.6691 13.7506 19.8276 13.7293 19.9638C13.7033 20.1302 13.6177 20.4514 13.2851 20.6468C12.9647 20.8349 12.6513 20.765 12.5024 20.7187C12.3726 20.6783 12.2302 20.6105 12.124 20.56C12.1156 20.556 12.1074 20.5521 12.0995 20.5483L11.0002 20.0261L9.90087 20.5483C9.89294 20.5521 9.88477 20.5559 9.87636 20.56C9.7702 20.6105 9.62782 20.6783 9.49796 20.7187C9.34903 20.765 9.03567 20.8349 8.7153 20.6468C8.38263 20.4514 8.29705 20.1302 8.27104 19.9638C8.24976 19.8276 8.25 19.6691 8.25016 19.5578C8.25017 19.5485 8.25019 19.5396 8.25019 19.5309V16.75H7.89796C6.91971 16.75 6.5777 16.7564 6.31562 16.8267C5.5963 17.0194 5.02286 17.5541 4.77694 18.2491ZM9.75019 16.75V18.9592L10.4995 18.6033C10.5013 18.6024 10.5043 18.6009 10.5083 18.5989C10.5573 18.5738 10.7638 18.4682 11.0002 18.4682C11.2365 18.4682 11.443 18.5738 11.4921 18.5989C11.4961 18.6009 11.499 18.6024 11.5009 18.6033L12.2502 18.9592V16.75H9.75019ZM7.89796 15.25C7.85879 15.25 7.8202 15.25 7.78217 15.25C6.9642 15.2497 6.40605 15.2495 5.92739 15.3778C5.49941 15.4925 5.10242 15.6798 4.75019 15.9259V8C4.75019 6.56458 4.75178 5.56347 4.85333 4.80812C4.95199 4.07435 5.13243 3.68577 5.4092 3.40901C5.68596 3.13225 6.07453 2.9518 6.80831 2.85315C7.56366 2.75159 8.56477 2.75 10.0002 2.75H14.0002C15.4356 2.75 16.4367 2.75159 17.1921 2.85315C17.9258 2.9518 18.3144 3.13225 18.5912 3.40901C18.8679 3.68577 19.0484 4.07435 19.147 4.80812C19.2486 5.56347 19.2502 6.56458 19.2502 8V15.25H7.89796ZM7.25019 7C7.25019 6.58579 7.58597 6.25 8.00019 6.25H16.0002C16.4144 6.25 16.7502 6.58579 16.7502 7C16.7502 7.41421 16.4144 7.75 16.0002 7.75H8.00019C7.58597 7.75 7.25019 7.41421 7.25019 7ZM7.25019 10.5C7.25019 10.0858 7.58597 9.75 8.00019 9.75H13.0002C13.4144 9.75 13.7502 10.0858 13.7502 10.5C13.7502 10.9142 13.4144 11.25 13.0002 11.25H8.00019C7.58597 11.25 7.25019 10.9142 7.25019 10.5Z" fill="#21ba40"></path> </g></svg></div>
             <div style="flex:1;">
               <div class="history-subject">${escapeHtml(sub ? sub.name : 'Unknown Subject')}</div>
-              <div class="history-teacher">${escapeHtml(sub ? sub.code : '—')}</div>
-              <div class="history-date">${dateStr}</div>
+              <div class="history-teacher"style="font-family:'Sora';">${escapeHtml(sub ? sub.code : '—')}</div>
+              <div class="history-date" style="font-family:'Sora';">${dateStr}</div>
             </div>
             <div style="text-align:right; flex-shrink:0;">
               <div class="score-pill">${ev.totalScore}%</div>
@@ -964,7 +968,7 @@ async function openSubmissionView(evId) {
       '</div>' +
       '<div class="sv-body">' +
         '<div class="sv-summary">' +
-          '<div class="sv-subject">' + escapeHtml(sub ? (sub.code + ' \u2014 ' + sub.name) : 'Subject') + '</div>' +
+          '<div class="sv-subject" >' + escapeHtml(sub ? (sub.code + ' \u2014 ' + sub.name) : 'Subject') + '</div>' +
           (teacher ? '<div class="sv-teacher">' + escapeHtml(teacher) + '</div>' : '') +
           '<div class="sv-date">Submitted ' + escapeHtml(dateStr) + '</div>' +
           '<div class="sv-overall">Overall Rating: ' + overall.toFixed(2) + '%</div>' +
@@ -1094,7 +1098,7 @@ async function renderFeedback() {
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
           <div>
             <div style="font-weight:700; font-size:0.88rem;">${escapeHtml(subjectName)}</div>
-            <div style="font-size:0.72rem; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:2px;">${escapeHtml(subjectCode)} · ${escapeHtml(teacherName)}</div>
+            <div style="font-size:0.72rem; color:var(--muted); font-family:'Sora',monospace; margin-top:2px;">${escapeHtml(subjectCode)} · ${escapeHtml(teacherName)}</div>
             <div style="font-size:0.7rem; color:var(--muted); margin-top:2px;"> ${dateStr}</div>
           </div>
           <div style="text-align:right; flex-shrink:0;">
