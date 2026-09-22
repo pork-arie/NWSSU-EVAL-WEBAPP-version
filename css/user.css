@@ -1209,7 +1209,7 @@ body.drawer-open { overflow: hidden; }
   margin-bottom: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
-.sv-subject { font-weight: 700; font-size: 0.92rem; color: var(--ink, #0f172a); }
+.sv-subject { font-weight: 700; font-size: 0.92rem; color: var(--ink, #0f172a); font-family: 'Sora'; }
 .sv-teacher { font-size: 0.8rem; color: var(--muted, #64748b); margin-top: 2px; }
 .sv-date    { font-size: 0.74rem; color: var(--muted, #64748b); margin-top: 8px; }
 .sv-overall { font-size: 1.15rem; font-weight: 800; color: var(--emerald, #059669); margin-top: 4px; }
