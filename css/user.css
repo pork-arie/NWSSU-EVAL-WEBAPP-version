@@ -1073,18 +1073,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
     padding: 0 10px;
     padding-top: env(safe-area-inset-top, 0px);
     box-sizing: content-box;
-    background: var(--white, #fff);
+    background: var(--forest);
     box-shadow: 0 1px 0 var(--border, #e5e7eb), 0 4px 14px rgba(15, 23, 42, 0.05);
   }
   .mobile-menu-btn {
     width: 44px; height: 44px;           /* comfortable thumb target */
     border-radius: 12px;
     transition: background 0.15s;
+    color: white;
   }
   .mobile-menu-btn:hover,
   .mobile-menu-btn:focus-visible { background: rgba(21, 96, 58, 0.08); outline: none; }
   .mobile-title {
-    font-size: 0.92rem; font-weight: 800; color: var(--forest, #064e3b);
+    font-size: 0.92rem; font-weight: 800; color: var(--bg);
     letter-spacing: -0.01em;
     /* One line, always: on a narrow phone it wrapped and pushed the bar taller. */
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1095,6 +1096,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
     background: var(--forest, #064e3b); color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.74rem; font-weight: 700; margin-right: 4px;
+    border: solid white 2px;
   }
 
   /* --- the drawer ------------------------------------------------- */
