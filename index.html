@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NwSSU-Student Evaluation Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Firebase Auth was never loaded here, so every Firestore call from this
+     page ran unauthenticated. See the AUTHENTICATION block in user.js. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<link rel="stylesheet" href="css/user.css">
+
+
+</head>
+<body>
+
+<!-- ============================================================
+     LOGIN PAGE
+     ------------------------------------------------------------
+     Signs the person in and nothing else; auth.js then sends them
+     to dashboard.html. Designed to match the Android app's sign-in
+     so a student sees the same screen on either.
+
+     Both screens here sit inside a real <form>. Browsers warn when a
+     password field has none, and without one password managers
+     cannot offer to save or fill the login. onsubmit replaces the
+     per-field Enter handlers - a form submits on Enter already.
+
+     Element ids are unchanged, so auth.js needs no edits:
+       loginSid  loginPass  loginPwPeek  loginBtn  loginError
+       pwGate  pwGateNew  pwGateConfirm  pwGateBtn  pwGateError
+     ============================================================ -->
+
+<!-- Forced password change. Shown between login and the app while the
+     account still uses its ID number as its password. -->
+<div id="pwGate" class="lg-bg" style="display:none;">
+  <div class="lg-card">
+    <div class="lg-mark">
+      <img src="icons/NWSSU-LOGO.jpg" alt="Northwest Samar State University"/>
+      <h1>Choose a password</h1>
+      <p>Your account still uses your ID number as its password.</p>
+    </div>
+
+    <form onsubmit="event.preventDefault(); submitNewPassword();">
+      <!-- Chrome asks for a username field in any form that sets a password,
+           so a password manager can save the NEW password under the right
+           account. Hidden from view; auth.js fills it with the ID number. -->
+      <input type="text" id="pwGateUser" name="username" autocomplete="username"
+             hidden readonly aria-hidden="true" tabindex="-1"/>
+      <label class="lg-label" for="pwGateNew">NEW PASSWORD:</label>
+      <div class="lg-field">
+        <input class="lg-input" type="password" id="pwGateNew"
+               placeholder="At least 6 characters" autocomplete="new-password"/>
+      </div>
+
+      <label class="lg-label" for="pwGateConfirm">CONFIRM PASSWORD:</label>
+      <div class="lg-field">
+        <input class="lg-input" type="password" id="pwGateConfirm"
+               placeholder="Type it again" autocomplete="new-password"/>
+      </div>
+
+      <button class="lg-btn" id="pwGateBtn" type="submit">Set new password</button>
+      <div class="lg-error" id="pwGateError"></div>
+    </form>
+
+    <p class="lg-foot">A private password keeps someone else from submitting in your name.</p>
+  </div>
+</div>
+
+<!-- Sign in -->
+<div id="loginPage" class="lg-bg">
+  <div class="lg-card">
+    <div class="lg-mark">
+      <img src="../icons/NWSSU-LOGO.jpg" alt="Northwest Samar State University"/>
+      <h1>Faculty Evaluation</h1>
+      <span class="lg-beta">BETA</span>
+    </div>
+
+    <form onsubmit="event.preventDefault(); doLogin();">
+      <label class="lg-label" for="loginSid">ID NUMBER:</label>
+      <div class="lg-field">
+        <input class="lg-input" type="text" id="loginSid"
+               placeholder="Enter your ID" autocomplete="username"/>
+      </div>
+
+      <label class="lg-label" for="loginPass">PASSWORD:</label>
+      <div class="lg-field">
+        <input class="lg-input" type="password" id="loginPass"
+               placeholder="Enter Password" autocomplete="current-password"/>
+        <button type="button" class="lg-peek" id="loginPwPeek"
+                onclick="toggleLoginPw()" aria-label="Show password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+
+      <button class="lg-btn" id="loginBtn" type="submit">Sign in</button>
+      <div class="lg-error" id="loginError">Invalid ID or password. Please try again.</div>
+    </form>
+
+    <!-- Agreement by signing in. Opens in a new tab so a half-typed login is
+         not lost by reading the terms. -->
+    <p class="lg-terms">
+      By signing in, you agree to the
+      <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a>.
+      This is a beta system for capstone testing.
+    </p>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- core.js declares the Firebase clients and shared state; auth.js owns
+     sign-in and the forced password change. app.js is NOT loaded here. -->
+<script src="js/core.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>
