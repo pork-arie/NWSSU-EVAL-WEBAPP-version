@@ -689,7 +689,7 @@ function renderQuestions() {
     html += `
       <div class="question-row">
         <div>
-          <div class="question-num">Q${i+1}</div>
+          <div class="question-num" style="font-family:'Sora'">Q${i+1}</div>
           <div class="question-text">${q.text}</div>
         </div>
         <div class="rating-group" id="rg_${q.id}">
