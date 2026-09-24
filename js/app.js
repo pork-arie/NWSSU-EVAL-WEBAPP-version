@@ -811,22 +811,29 @@ function closeResult() {
 async function renderHistory() {
   showSkeleton('history');
   await loadStudentData();
-  document.getElementById('historyCount').textContent = `${myEvals.length} record${myEvals.length !== 1 ? 's' : ''}`;
+  // Counted from the enrolled subjects only, so the badge matches the rows
+  // below it rather than every evaluation ever submitted.
+  const visibleEvals = myEvals.filter(ev => ev.subjectId && mySubjects.some(s => s.docId === ev.subjectId));
+  document.getElementById('historyCount').textContent = `${visibleEvals.length} record${visibleEvals.length !== 1 ? 's' : ''}`;
 
-  if (!myEvals.length) {
+  if (!visibleEvals.length) {
     document.getElementById('historyList').innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No evaluations submitted yet.</div></div>`;
     return;
   }
 
   const subMap = {};
   mySubjects.forEach(s => subMap[s.docId] = s);
-  // Subjects evaluated but no longer enrolled in are not in mySubjects, so
-  // they showed as "Unknown Subject". Look them up.
-  await Promise.all(myEvals
-    .filter(ev => ev.subjectId && !subMap[ev.subjectId])
-    .map(async ev => { const sub = await _subjectFor(ev.subjectId); if (sub) subMap[ev.subjectId] = sub; }));
 
-  const sorted = [...myEvals].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  // ONLY subjects the student is enrolled in right now.
+  //
+  // Unenrol someone and the subject leaves this list, even if they had already
+  // rated it - the same rule the app follows, and the same rule the SEF side
+  // follows for deleted faculty. The evaluation itself stays in Firestore and
+  // still counts towards the reports; this page lists what is current, not a
+  // permanent record of everything ever submitted.
+  const sorted = myEvals
+    .filter(ev => ev.subjectId && subMap[ev.subjectId])
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   document.getElementById('historyList').innerHTML = `
     <div class="history-list">
@@ -1029,15 +1036,10 @@ async function renderFeedback() {
   const subMap = {};
   mySubjects.forEach(s => subMap[s.docId] = s);
 
-  const missingIds = [...new Set(
-    myEvals.map(e => e.subjectId).filter(id => id && !subMap[id])
-  )];
-  await Promise.all(missingIds.map(async id => {
-    try {
-      const d = await db.collection('subjects').doc(id).get();
-      if (d.exists) subMap[id] = { ...d.data(), docId: d.id };
-    } catch (e) { /* label falls back to "Unknown Subject" */ }
-  }));
+  // REMOVED: a lookup that fetched subjects missing from the enrolment.
+  // It existed to label them instead of showing "Unknown Subject", but it also
+  // put unenrolled subjects back into subMap - which would defeat the filter
+  // below, since that filter asks whether the subject is still enrolled.
 
   const teacherMap = {};
   const teacherIds = [...new Set(
@@ -1050,7 +1052,9 @@ async function renderFeedback() {
     } catch (e) { /* falls back to a dash */ }
   }));
 
-  const withComments = myEvals.filter(e => e.comment && e.comment.trim() !== '');
+  // Same rule as My Evaluations: only subjects still on the student's enrolment.
+  const withComments = myEvals.filter(e =>
+    e.comment && e.comment.trim() !== '' && e.subjectId && subMap[e.subjectId]);
   const sorted       = [...withComments].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (periodOpen) {
