@@ -40,6 +40,186 @@ function showSkeleton(page) {
                        '<span class="skeleton sk-quote"></span></div>').join(''));
 }
 
+
+
+// ============================================================
+
+// MULTIPLE TEACHERS PER SUBJECT
+
+// ------------------------------------------------------------
+
+// A subject can have several teachers. Each may be limited to
+
+// certain sections ("BSIT 1A"); one with no sections teaches
+
+// everyone. A student rates each teacher THEY have, separately.
+
+//
+
+// myClasses holds one entry per (subject, teacher) pair this
+
+// student has - it is what the dashboard, the rating picker and
+
+// the counts are built from.
+
+//
+
+// _courseShort and _sectionLabelOf MUST produce exactly what the
+
+// admin's courseShorthand and _sectionLabel produce
+
+// (admin-annex.js / admin-scoring.js), or a section-limited
+
+// teacher would not match this student. Copied word for word.
+
+// ============================================================
+
+let myClasses = [];
+
+
+
+function _courseShort(name) {
+
+  const n = String(name || '').trim();
+
+  if (!n) return '';
+
+  const beforeParen = n.split('(')[0].trim();
+
+  if (n.indexOf('(') > 0 && beforeParen.length >= 2 && beforeParen.length <= 22) {
+
+    return beforeParen.replace(/\s+/g, ' ').toUpperCase();
+
+  }
+
+  const paren = n.match(/\(([^)]{2,24})\)/);
+
+  if (paren) return paren[1].trim().replace(/\s+/g, ' ').toUpperCase();
+
+  if (n.indexOf(' ') === -1 && n.length <= 8) return n.toUpperCase();
+
+  const STOP = ['of', 'in', 'and', 'the', 'for', 'a'];
+
+  let out = '';
+
+  n.replace(/\([^)]*\)/g, ' ')
+
+   .split(/[\s\-\/]+/).filter(Boolean).forEach(function (w) {
+
+      if (STOP.indexOf(w.toLowerCase()) > -1) return;
+
+      if (!/[A-Za-z]/.test(w[0])) return;
+
+      out += (w === w.toUpperCase() && w.length <= 4) ? w : w[0];
+
+  });
+
+  return out.length >= 2 ? out.toUpperCase() : n.toUpperCase();
+
+}
+
+
+
+function _sectionLabelOf(st) {
+
+  if (!st) return '\u2014';
+
+  const course = _courseShort(st.course);
+
+  const yr  = String(st.year || '').match(/\d+/);
+
+  const sec = String(st.section || '').trim().toUpperCase();
+
+  return (course + ' ' + (yr ? yr[0] : '') + sec).trim() || '\u2014';
+
+}
+
+
+
+function subjectTeachersOf(sub) {
+
+  if (sub && Array.isArray(sub.teachers) && sub.teachers.length) {
+
+    const seen = new Set();
+
+    return sub.teachers
+
+      .filter(t => t && t.id && !seen.has(t.id) && seen.add(t.id))
+
+      .map(t => ({ id: t.id, sections: Array.isArray(t.sections) ? t.sections.filter(Boolean) : [] }));
+
+  }
+
+  return (sub && sub.teacherId) ? [{ id: sub.teacherId, sections: [] }] : [];
+
+}
+
+
+
+function teacherTeachesMe(sub, teacherId) {
+
+  const t = subjectTeachersOf(sub).find(x => x.id === teacherId);
+
+  if (!t) return false;
+
+  if (!t.sections.length) return true;
+
+  return t.sections.indexOf(_sectionLabelOf(currentStudent)) !== -1;
+
+}
+
+
+
+// New ratings record their teacher. A very old one may not; it belongs to the
+
+// subject's first teacher only, never to all of them.
+
+function evalBelongsTo(e, sub, teacherId) {
+
+  if (e.teacherId) return e.teacherId === teacherId;
+
+  return subjectTeachersOf(sub).length > 0 && subjectTeachersOf(sub)[0].id === teacherId;
+
+}
+
+
+
+function buildMyClasses() {
+
+  const out = [];
+
+  mySubjects.forEach(sub => {
+
+    const mine = subjectTeachersOf(sub).filter(t => teacherTeachesMe(sub, t.id));
+
+    if (!mine.length) { out.push({ sub, teacherId: '' }); return; }   // shown, but not rateable
+
+    mine.forEach(t => out.push({ sub, teacherId: t.id }));
+
+  });
+
+  return out;
+
+}
+
+
+
+// Classes the student can actually rate. A subject whose teachers all cover
+// OTHER sections, or which has no teacher yet, is still listed so the student
+// can see they are enrolled - but it is not counted as owed, or the progress
+// would sit at "1 pending" forever with nothing they could do about it.
+function rateableClasses() { return myClasses.filter(c => c.teacherId); }
+
+function classDone(c) {
+
+  return !!c.teacherId && myEvals.some(e => e.subjectId === c.sub.docId && evalBelongsTo(e, c.sub, c.teacherId));
+
+}
+
+function _classKey(subId, teacherId) { return subId + '|' + (teacherId || ''); }
+
+
+
 // Boot after login: load the published questions, then the data.
 async function initApp(isInactive = false) {
   // The forced password change is handled on index.html, before the redirect
@@ -144,7 +324,14 @@ async function loadSupervisorData() {
       .get();
     sefSnap.forEach(doc => {
       const e = doc.data();
-      if (e.evaluatorType === 'supervisor') mySef.push({ ...e, docId: doc.id });
+      if (e.evaluatorType !== 'supervisor') return;
+      // The uid belongs to the Teacher ID, not the person. If a deleted
+      // supervisor's ID was given to a new record, both share one uid - keep
+      // only SEFs written by THIS record (web stores it in supervisorId, the
+      // app in studentId).
+      const owner = e.supervisorId || e.studentId || '';
+      if (owner && owner !== currentStudent.docId) return;
+      mySef.push({ ...e, docId: doc.id });
     });
   }
 }
@@ -364,7 +551,16 @@ async function loadStudentData() {
       const snapE = await db.collection('evaluations')
         .where('evaluatorUid', '==', myUid)
         .get();
-      snapE.forEach(doc => { seen.add(doc.id); myEvals.push({ ...doc.data(), docId: doc.id }); });
+      snapE.forEach(doc => {
+        const e = doc.data();
+        // The uid belongs to the Student ID, not the person. If a deleted
+        // student's ID was given to a NEW record, both share one uid - without
+        // this, the new student would see the old one's evaluations as their
+        // own and be blocked from rating those subjects.
+        if (e.studentId && e.studentId !== currentStudent.docId) return;
+        seen.add(doc.id);
+        myEvals.push({ ...e, docId: doc.id });
+      });
       console.info('[load] evaluations:', myEvals.length);
     } catch (err) {
       console.error('[load] evaluations query failed:', err.code || '', err.message);
@@ -386,6 +582,8 @@ async function loadStudentData() {
     console.info('Older evaluations without evaluatorUid are not readable under '
       + 'the current rules; the history shown may be incomplete.');
   }
+
+  myClasses = buildMyClasses();
 }
 
 function showPage(id) {
@@ -466,8 +664,11 @@ async function renderDashboard() {
   document.getElementById('dashGreeting').textContent  = `${greet}, ${firstName}! 👋`;
   document.getElementById('dashSubtitle').textContent = `Welcome back to your evaluation portal.`;
 
-  const totalSubjects = mySubjects.length;
-  const done     = mySubjects.filter(s => myEvals.some(e => e.subjectId === s.docId)).length;
+  // Counted per class - a subject with two teachers is two ratings to give.
+  await ensureSubjectTeacherNames();
+  const rateable = rateableClasses();
+  const totalSubjects = rateable.length;
+  const done     = rateable.filter(classDone).length;
   const pending  = totalSubjects - done;
 
   document.getElementById('dashTotalSubjects').textContent = totalSubjects;
@@ -540,8 +741,11 @@ async function renderDashboard() {
     return;
   }
 
-    document.getElementById('dashSubjectList').innerHTML = mySubjects.map(sub => {
-    const evaluated = myEvals.some(e => e.subjectId === sub.docId);
+    document.getElementById('dashSubjectList').innerHTML = myClasses.map(c => {
+    const sub = c.sub;
+    const evaluated = classDone(c);
+    const noTeacher = !c.teacherId;
+    const tName = (window._teacherNames || {})[c.teacherId] || '';
     return `
       <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f1f5f9; gap:12px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:11px;">
@@ -552,22 +756,22 @@ async function renderDashboard() {
           </div>
           <div>
             <div style="font-weight:700; font-size:0.86rem;">${sub.name}</div>
-            <div style="font-size:0.72rem; color:var(--muted); font-family:'Sora',monospace;">${sub.code}</div>
+            <div style="font-size:0.72rem; color:var(--muted); font-family:'Sora',monospace;">${escapeHtml(sub.code || '')}${tName ? ' \u00b7 ' + escapeHtml(tName) : ''}</div>
           </div>
         </div>
-        <span class="badge ${evaluated ? 'badge-success' : 'badge-warning'}">
-          ${evaluated ? '✓ Evaluated' : '⏳ Pending'}
+        <span class="badge ${noTeacher ? 'badge-neutral' : (evaluated ? 'badge-success' : 'badge-warning')}">
+          ${noTeacher ? 'No teacher yet' : (evaluated ? '✓ Evaluated' : '⏳ Pending')}
         </span>
       </div>`;
   }).join('') + `<div style="height:1px;"></div>`;
 }
 
 async function ensureSubjectTeacherNames() {
-  const missing = [...new Set(mySubjects
-    .filter(s => !s.teacherName && s.teacherId)
-    .map(s => s.teacherId))];
+  window._teacherNames = window._teacherNames || {};
+  const missing = [...new Set(myClasses.map(c => c.teacherId)
+    .filter(id => id && window._teacherNames[id] === undefined))];
   if (!missing.length) return;
-  const names = {};
+  const names = window._teacherNames;
   await Promise.all(missing.map(async id => {
     try {
       const d = await db.collection('teachers').doc(id).get();
@@ -582,17 +786,29 @@ async function renderEvaluate() {
   await ensureSubjectTeacherNames();
 
   const picker = document.getElementById('subjectPicker');
-  const doneIds = new Set(myEvals.map(e => e.subjectId));
-
-  picker.innerHTML = mySubjects.map(sub => {
-    const done = doneIds.has(sub.docId);
-    const teacher = sub.teacherName || sub._teacherName || '';
+  picker.innerHTML = myClasses.map(c => {
+    const sub = c.sub;
+    const done = classDone(c);
+    const teacher = (window._teacherNames || {})[c.teacherId] || '';
     const initials = (teacher || sub.code || '?').trim().split(/\s+/)
       .map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    // Nothing to rate: no teacher of this subject takes this student's section.
+    if (!c.teacherId) {
+      return `
+        <div class="subject-card is-unavailable" aria-disabled="true">
+          <span class="subject-card-avatar">${escapeHtml((sub.code || '?').slice(0, 2).toUpperCase())}</span>
+          <span class="subject-card-main">
+            <span class="subject-card-code">${escapeHtml(sub.code || '')}</span>
+            <span class="subject-card-name">${escapeHtml(sub.name || '')}</span>
+            <span class="subject-card-teacher">No teacher assigned for your section yet</span>
+          </span>
+          <span class="subject-card-status"><span class="pill pill-na">Not available</span></span>
+        </div>`;
+    }
     return `
       <button type="button" class="subject-card${done ? ' is-done' : ''}"
-              data-subid="${escapeHtml(sub.docId)}"
-              onclick="selectSubject('${escapeHtml(sub.docId)}')"
+              data-key="${escapeHtml(_classKey(sub.docId, c.teacherId))}"
+              onclick="selectClass('${escapeHtml(sub.docId)}', '${escapeHtml(c.teacherId)}')"
               aria-pressed="false">
         <span class="subject-card-avatar">${escapeHtml(initials)}</span>
         <span class="subject-card-main">
@@ -624,15 +840,26 @@ async function renderEvaluate() {
 }
 
 window._selectedSubjectId = '';
+window._selectedTeacherId = '';
 
-function selectSubject(subId) {
+// One card per (subject, teacher). Rating is always FOR a specific teacher.
+function selectClass(subId, teacherId) {
   window._selectedSubjectId = subId;
+  window._selectedTeacherId = teacherId || '';
+  const key = _classKey(subId, teacherId);
   document.querySelectorAll('.subject-card').forEach(el => {
-    const on = el.getAttribute('data-subid') === subId;
+    const on = el.getAttribute('data-key') === key;
     el.classList.toggle('is-selected', on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   onSubjectChange();
+}
+
+// Kept for anything that still calls it with only a subject: picks the first
+// teacher this student has in that subject.
+function selectSubject(subId) {
+  const c = myClasses.find(x => x.sub.docId === subId);
+  selectClass(subId, c ? c.teacherId : '');
 }
 
 async function onSubjectChange() {
@@ -645,11 +872,12 @@ async function onSubjectChange() {
 
   if (!subId || !subObj) return;
 
-  const alreadyDone = myEvals.some(e => e.subjectId === subId);
+  const teacherId   = window._selectedTeacherId || subObj.teacherId || '';
+  const alreadyDone = myEvals.some(e => e.subjectId === subId && evalBelongsTo(e, subObj, teacherId));
 
-  if (subObj.teacherId) {
+  if (teacherId) {
     try {
-      const tSnap = await db.collection('teachers').doc(subObj.teacherId).get();
+      const tSnap = await db.collection('teachers').doc(teacherId).get();
       if (tSnap.exists) {
         const t = tSnap.data();
         document.getElementById('teacherInitials').textContent = t.name ? t.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'T';
@@ -689,7 +917,7 @@ function renderQuestions() {
     html += `
       <div class="question-row">
         <div>
-          <div class="question-num" style="font-family:'Sora'">Q${i+1}</div>
+          <div class="question-num">Q${i+1}</div>
           <div class="question-text">${q.text}</div>
         </div>
         <div class="rating-group" id="rg_${q.id}">
@@ -734,7 +962,14 @@ async function submitEvaluation() {
   const subObj = mySubjects.find(s => s.docId === subId);
 
   if (!subId || !subObj) { showToast('Please select a subject first.', 'warning'); return; }
-  if (!subObj.teacherId)  { showToast('This subject has no assigned teacher.', 'warning'); return; }
+  const teacherId = window._selectedTeacherId || subObj.teacherId || '';
+  if (!teacherId)  { showToast('This subject has no assigned teacher.', 'warning'); return; }
+  if (!teacherTeachesMe(subObj, teacherId)) {
+    showToast('That teacher is not assigned to your section for this subject.', 'warning'); return;
+  }
+  if (myEvals.some(e => e.subjectId === subId && evalBelongsTo(e, subObj, teacherId))) {
+    showToast('You have already evaluated this teacher for this subject.', 'warning'); return;
+  }
 
   const ratings = {};
   let rawTotal  = 0;
@@ -763,10 +998,12 @@ async function submitEvaluation() {
   const _term = gate.term;
 
   const evalRecord = {
-    id:            `set_${currentStudent.docId}_${subId}_${_term.year}_${_term.sem}`.replace(/\s+/g, '-'),
+    // The teacher is part of the id: one rating per teacher, so a subject with
+    // three teachers takes three separate records rather than overwriting one.
+    id:            `set_${currentStudent.docId}_${subId}_${teacherId}_${_term.year}_${_term.sem}`.replace(/\s+/g, '-'),
     studentId:     currentStudent.docId,
     subjectId:     subId,
-    teacherId:     subObj.teacherId,
+    teacherId:     teacherId,
     evaluatorType: 'student',
     evaluatorUid:  (fbAuth.currentUser && fbAuth.currentUser.uid) || '',
     ratings:       ratings,
@@ -811,6 +1048,7 @@ function closeResult() {
 async function renderHistory() {
   showSkeleton('history');
   await loadStudentData();
+  await ensureSubjectTeacherNames();   // so each row can say which teacher it was for
   // Counted from the enrolled subjects only, so the badge matches the rows
   // below it rather than every evaluation ever submitted.
   const visibleEvals = myEvals.filter(ev => ev.subjectId && mySubjects.some(s => s.docId === ev.subjectId));
@@ -849,7 +1087,8 @@ async function renderHistory() {
             <div class="history-dot"><svg width="188px" height="188px" viewBox="0 0 24.00 24.00" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#21ba40" stroke-width="0.00024000000000000003"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="0.144"></g><g id="SVGRepo_iconCarrier"> <path fill-rule="evenodd" clip-rule="evenodd" d="M9.94531 1.25H14.0551C15.4227 1.24998 16.525 1.24996 17.3919 1.36652C18.292 1.48754 19.0499 1.74643 19.6518 2.34835C20.2538 2.95027 20.5126 3.70814 20.6337 4.60825C20.7502 5.47522 20.7502 6.57754 20.7502 7.94513V16.0549C20.7502 17.4225 20.7502 18.5248 20.6337 19.3918C20.5126 20.2919 20.2538 21.0497 19.6518 21.6517C19.0499 22.2536 18.292 22.5125 17.3919 22.6335C16.525 22.75 15.4226 22.75 14.0551 22.75H9.94532C8.57773 22.75 7.4754 22.75 6.60844 22.6335C5.70833 22.5125 4.95045 22.2536 4.34854 21.6517C3.74662 21.0497 3.48773 20.2919 3.36671 19.3918C3.32801 19.1039 3.30216 18.7902 3.2849 18.4494C3.24582 18.326 3.23821 18.1912 3.26895 18.0568C3.25016 17.4649 3.25017 16.7991 3.25019 16.0549V7.94513C3.25017 6.57754 3.25015 5.47522 3.36671 4.60825C3.48773 3.70814 3.74662 2.95027 4.34854 2.34835C4.95045 1.74643 5.70833 1.48754 6.60843 1.36652C7.4754 1.24996 8.57772 1.24998 9.94531 1.25ZM4.77694 18.2491C4.79214 18.6029 4.81597 18.914 4.85333 19.1919C4.95199 19.9257 5.13243 20.3142 5.4092 20.591C5.68596 20.8678 6.07453 21.0482 6.80831 21.1469C7.56366 21.2484 8.56477 21.25 10.0002 21.25H14.0002C15.4356 21.25 16.4367 21.2484 17.1921 21.1469C17.9258 21.0482 18.3144 20.8678 18.5912 20.591C18.8679 20.3142 19.0484 19.9257 19.147 19.1919C19.2299 18.5756 19.2462 17.7958 19.2494 16.75H13.7502V19.5309C13.7502 19.5396 13.7502 19.5485 13.7502 19.5578C13.7504 19.6691 13.7506 19.8276 13.7293 19.9638C13.7033 20.1302 13.6177 20.4514 13.2851 20.6468C12.9647 20.8349 12.6513 20.765 12.5024 20.7187C12.3726 20.6783 12.2302 20.6105 12.124 20.56C12.1156 20.556 12.1074 20.5521 12.0995 20.5483L11.0002 20.0261L9.90087 20.5483C9.89294 20.5521 9.88477 20.5559 9.87636 20.56C9.7702 20.6105 9.62782 20.6783 9.49796 20.7187C9.34903 20.765 9.03567 20.8349 8.7153 20.6468C8.38263 20.4514 8.29705 20.1302 8.27104 19.9638C8.24976 19.8276 8.25 19.6691 8.25016 19.5578C8.25017 19.5485 8.25019 19.5396 8.25019 19.5309V16.75H7.89796C6.91971 16.75 6.5777 16.7564 6.31562 16.8267C5.5963 17.0194 5.02286 17.5541 4.77694 18.2491ZM9.75019 16.75V18.9592L10.4995 18.6033C10.5013 18.6024 10.5043 18.6009 10.5083 18.5989C10.5573 18.5738 10.7638 18.4682 11.0002 18.4682C11.2365 18.4682 11.443 18.5738 11.4921 18.5989C11.4961 18.6009 11.499 18.6024 11.5009 18.6033L12.2502 18.9592V16.75H9.75019ZM7.89796 15.25C7.85879 15.25 7.8202 15.25 7.78217 15.25C6.9642 15.2497 6.40605 15.2495 5.92739 15.3778C5.49941 15.4925 5.10242 15.6798 4.75019 15.9259V8C4.75019 6.56458 4.75178 5.56347 4.85333 4.80812C4.95199 4.07435 5.13243 3.68577 5.4092 3.40901C5.68596 3.13225 6.07453 2.9518 6.80831 2.85315C7.56366 2.75159 8.56477 2.75 10.0002 2.75H14.0002C15.4356 2.75 16.4367 2.75159 17.1921 2.85315C17.9258 2.9518 18.3144 3.13225 18.5912 3.40901C18.8679 3.68577 19.0484 4.07435 19.147 4.80812C19.2486 5.56347 19.2502 6.56458 19.2502 8V15.25H7.89796ZM7.25019 7C7.25019 6.58579 7.58597 6.25 8.00019 6.25H16.0002C16.4144 6.25 16.7502 6.58579 16.7502 7C16.7502 7.41421 16.4144 7.75 16.0002 7.75H8.00019C7.58597 7.75 7.25019 7.41421 7.25019 7ZM7.25019 10.5C7.25019 10.0858 7.58597 9.75 8.00019 9.75H13.0002C13.4144 9.75 13.7502 10.0858 13.7502 10.5C13.7502 10.9142 13.4144 11.25 13.0002 11.25H8.00019C7.58597 11.25 7.25019 10.9142 7.25019 10.5Z" fill="#21ba40"></path> </g></svg></div>
             <div style="flex:1;">
               <div class="history-subject">${escapeHtml(sub ? sub.name : 'Unknown Subject')}</div>
-              <div class="history-teacher" style="font-family:'Sora';">${escapeHtml(sub ? sub.code : '—')}</div>
+              <div class="history-teacher" style="font-family:'Sora';">${escapeHtml(sub ? sub.code : '—')}${
+                (window._teacherNames || {})[ev.teacherId] ? ' \u00b7 ' + escapeHtml(window._teacherNames[ev.teacherId]) : ''}</div>
               <div class="history-date" style="font-family:'Sora';">${dateStr}</div>
             </div>
             <div style="text-align:right; flex-shrink:0;">
@@ -937,7 +1176,8 @@ async function openSubmissionView(evId) {
   document.body.classList.add('drawer-open');          // same scroll lock as the drawer
 
   const [sub, questions] = await Promise.all([_subjectFor(ev.subjectId), _questionsFor(ev)]);
-  const teacher = (sub && sub.teacherName) || await _teacherName(ev.teacherId || (sub && sub.teacherId));
+  // The rating's OWN teacher - a subject may have several.
+  const teacher = await _teacherName(ev.teacherId || (sub && sub.teacherId));
 
   // Same rule as the app: the score saved at submission, recomputed only if
   // missing - dividing by the items actually answered.
@@ -1142,13 +1382,14 @@ async function renderProfile() {
       <div class="info-value">${item.value}</div>
     </div>`).join('');
 
-  const done    = mySubjects.filter(sub => myEvals.some(e => e.subjectId === sub.docId)).length;
-  const pending = mySubjects.length - done;
+  const _rate   = rateableClasses();
+  const done    = _rate.filter(classDone).length;
+  const pending = _rate.length - done;
 
   document.getElementById('profileEvalSummary').innerHTML = `
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:14px;">
       <div class="info-item" style="text-align:center;">
-        <div style="font-size:1.8rem; font-weight:800; color:var(--forest); line-height:1;">${mySubjects.length}</div>
+        <div style="font-size:1.8rem; font-weight:800; color:var(--forest); line-height:1;">${_rate.length}</div>
         <div class="info-label" style="margin-top:4px;">Enrolled Subjects</div>
       </div>
       <div class="info-item" style="text-align:center;">

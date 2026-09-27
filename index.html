@@ -43,6 +43,17 @@
 
 </head>
 <body>
+<!-- Loading splash: the university seal while the page signs in and loads.
+     core.js hideSplash() fades it out; the CSS hides it on its own after 15s,
+     so a script failure can never leave the page covered. -->
+<div id="appSplash" class="app-splash" role="status" aria-label="Loading">
+  <div class="app-splash-inner">
+    <div class="app-splash-seal"><img src="icons/NWSSU-LOGO1.png" alt=""/></div>
+    <div class="app-splash-title">Faculty Evaluation</div>
+    <div class="app-splash-sub">Northwest Samar State University</div>
+    <div class="app-splash-spin"></div>
+  </div>
+</div>
 
 <!-- ============================================================
      LOGIN PAGE
@@ -81,12 +92,18 @@
       <div class="lg-field">
         <input class="lg-input" type="password" id="pwGateNew"
                placeholder="At least 6 characters" autocomplete="new-password"/>
+        <button type="button" class="lg-peek" onclick="togglePwField('pwGateNew', this)" aria-label="Show password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
 
       <label class="lg-label" for="pwGateConfirm">CONFIRM PASSWORD:</label>
       <div class="lg-field">
         <input class="lg-input" type="password" id="pwGateConfirm"
                placeholder="Type it again" autocomplete="new-password"/>
+        <button type="button" class="lg-peek" onclick="togglePwField('pwGateConfirm', this)" aria-label="Show password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
 
       <button class="lg-btn" id="pwGateBtn" type="submit">Set new password</button>

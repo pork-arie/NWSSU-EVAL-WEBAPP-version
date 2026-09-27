@@ -44,6 +44,26 @@ function rosterPasswordFor(rec) {
   return pw || id;
 }
 
+// ============================================================
+// LOADING SPLASH
+// ------------------------------------------------------------
+// Both pages open with #appSplash covering them (see user.css).
+// hideSplash() fades it once the page knows what to show. It stays
+// up at least SPLASH_MIN_MS from page load so a fast connection does
+// not flash it, and it is left alone while the page is redirecting -
+// the next page shows its own.
+// ============================================================
+const SPLASH_MIN_MS = 500;
+function hideSplash() {
+  const el = document.getElementById('appSplash');
+  if (!el || el.classList.contains('splash-out') || window._leavingPage) return;
+  const since = (window.performance && performance.now) ? performance.now() : SPLASH_MIN_MS;
+  setTimeout(function () {
+    el.classList.add('splash-out');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 450);
+  }, Math.max(0, SPLASH_MIN_MS - since));
+}
+
 let currentStudent = null;   // { ...firestoreData, docId }
 let mySubjects     = [];     // subjects the student is enrolled in
 let myEvals        = [];     // evaluations the student has submitted

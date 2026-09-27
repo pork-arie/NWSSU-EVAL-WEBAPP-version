@@ -18,6 +18,17 @@
 
 </head>
 <body>
+<!-- Loading splash: the university seal while the page signs in and loads.
+     core.js hideSplash() fades it out; the CSS hides it on its own after 15s,
+     so a script failure can never leave the page covered. -->
+<div id="appSplash" class="app-splash" role="status" aria-label="Loading">
+  <div class="app-splash-inner">
+    <div class="app-splash-seal"><img src="icons/NWSSU-LOGO1.png" alt=""/></div>
+    <div class="app-splash-title">Faculty Evaluation</div>
+    <div class="app-splash-sub">Northwest Samar State University</div>
+    <div class="app-splash-spin"></div>
+  </div>
+</div>
 
 <!-- ============================================================
      DASHBOARD
@@ -328,15 +339,24 @@
             <div style="max-width:400px;">
               <div class="settings-form-row">
                 <label class="settings-form-label">Current Password</label>
-                <input class="settings-input" type="password" id="pwCurrent" placeholder="••••••••"/>
+                <div class="pw-wrap">
+                  <input class="settings-input" type="password" id="pwCurrent" placeholder="••••••••"/>
+                  <button type="button" class="lg-peek" onclick="togglePwField('pwCurrent', this)" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
               </div>
               <div class="settings-form-row">
                 <label class="settings-form-label">New Password</label>
-                <input class="settings-input" type="password" id="pwNew" placeholder="Minimum 6 characters"/>
+                <div class="pw-wrap">
+                  <input class="settings-input" type="password" id="pwNew" placeholder="Minimum 6 characters"/>
+                  <button type="button" class="lg-peek" onclick="togglePwField('pwNew', this)" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
               </div>
               <div class="settings-form-row">
                 <label class="settings-form-label">Confirm New Password</label>
-                <input class="settings-input" type="password" id="pwConfirm" placeholder="Repeat new password"/>
+                <div class="pw-wrap">
+                  <input class="settings-input" type="password" id="pwConfirm" placeholder="Repeat new password"/>
+                  <button type="button" class="lg-peek" onclick="togglePwField('pwConfirm', this)" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
               </div>
               <div id="pwFeedback" style="font-size:0.78rem; margin-bottom:12px; display:none;"></div>
               <button class="btn btn-primary" onclick="changePassword()">

@@ -1334,3 +1334,52 @@ body.drawer-open { overflow: hidden; }
 .sv-badge[data-val="2"] { background: #d97706; }
 .sv-badge[data-val="1"] { background: #dc2626; }
 .sv-badge[data-val="-"] { background: #94a3b8; }
+
+/* ============================================================
+   EYE BUTTON IN SETTINGS
+   ------------------------------------------------------------
+   Reuses the login page's .lg-peek button; the wrapper gives it
+   something to sit against and the input room on the right.
+   ============================================================ */
+.pw-wrap { position: relative; }
+.pw-wrap .settings-input { padding-right: 44px; }
+
+/* ============================================================
+   LOADING SPLASH
+   ------------------------------------------------------------
+   Shown the moment either page opens - the seal on the deep green
+   the Android app uses - and faded by hideSplash() (core.js) once
+   the page knows what to show. The failsafe animation hides it
+   after 15s even if no script ever runs.
+   ============================================================ */
+.app-splash {
+  position: fixed; inset: 0; z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  background: #064e3b;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+  animation: splashFailsafe 0s linear 15s forwards;
+}
+.app-splash.splash-out { opacity: 0; visibility: hidden; pointer-events: none; }
+@keyframes splashFailsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+.app-splash-inner { text-align: center; padding: 24px; animation: splashIn 0.5s ease both; }
+@keyframes splashIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+
+.app-splash-seal {
+  width: 128px; height: 128px; margin: 0 auto 20px;
+  border-radius: 50%; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+}
+.app-splash-seal img { width: 108px; height: 108px; object-fit: contain; }
+.app-splash-title { color: #fff; font-weight: 800; font-size: 1.4rem; font-family: 'Sora', system-ui, sans-serif; }
+.app-splash-sub { color: rgba(255, 255, 255, 0.75); font-size: 0.82rem; margin-top: 4px; font-family: 'Sora', system-ui, sans-serif; }
+.app-splash-spin {
+  width: 26px; height: 26px; margin: 32px auto 0; border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.25); border-top-color: rgba(255, 255, 255, 0.9);
+  animation: splashSpin 0.8s linear infinite;
+}
+@keyframes splashSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .app-splash-inner, .app-splash-spin { animation: none; }
+}

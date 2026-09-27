@@ -31,6 +31,7 @@ function _clearHops() { try { sessionStorage.removeItem('_navHops'); } catch (e)
 
 function goToDashboard() {
   if (_hop() > 3) { console.error('Redirect loop stopped on the way to the dashboard.'); return; }
+  window._leavingPage = true;
   location.replace('dashboard.html');
 }
 // `reason` is shown on the login page. Every bounce from the dashboard used to
@@ -42,6 +43,7 @@ function goToLogin(reason) {
     console.warn('Returning to the login:', reason);
   }
   if (_hop() > 3) { console.error('Redirect loop stopped on the way to the login.'); return; }
+  window._leavingPage = true;
   location.replace('index.html');
 }
 
@@ -222,7 +224,16 @@ async function doLogin() {
       return;
     }
 
-    const doc  = snap.docs[0];
+    // One ID can have several records: a deleted one plus the one the admin
+    // re-added in its place. docs[0] is ordered by document ID, which is always
+    // the OLD record, so the person was told their account was removed while
+    // the admin showed it as active. Prefer live + active, then any live one,
+    // and only fall back to a deleted record so the right message still shows.
+    const isLive   = d => !d.data().deleted;
+    const isActive = d => (d.data().status || 'active') === 'active';
+    const doc  = snap.docs.find(d => isLive(d) && isActive(d))
+              || snap.docs.find(isLive)
+              || snap.docs[0];
     const data = doc.data();
 
     if (data.deleted) { showLoginError('Account has been removed. Please contact your administrator.'); return; }
@@ -261,12 +272,33 @@ async function doLogin() {
   }
 }
 
+// ============================================================
+// SHOW / HIDE PASSWORD (the eye button)
+// ------------------------------------------------------------
+// One function for every password box: the login, the forced
+// password change, and Settings > Change Password. The icon flips
+// between an open eye (click to show) and a crossed-out eye (click
+// to hide), like the Android app.
+// ============================================================
+const _EYE_OPEN =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const _EYE_SHUT =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
+
+function togglePwField(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (btn) {
+    btn.innerHTML = show ? _EYE_SHUT : _EYE_OPEN;
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  }
+}
+
+// Kept for the login page's existing onclick.
 function toggleLoginPw() {
-  const inp = document.getElementById('loginPass');
-  const btn = document.getElementById('loginPwPeek');
-  const showing = inp.type === 'text';
-  inp.type = showing ? 'password' : 'text';
-  if (btn) btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  togglePwField('loginPass', document.getElementById('loginPwPeek'));
 }
 
 function showLoginError(msg) {
@@ -306,6 +338,11 @@ function showPasswordGate() {
   if (pwUser && currentStudent) pwUser.value = currentStudent.sid || currentStudent.tid || '';
   document.getElementById('pwGateNew').value = '';
   document.getElementById('pwGateConfirm').value = '';
+  // Start hidden, whatever the eye buttons were left on.
+  ['pwGateNew', 'pwGateConfirm'].forEach(function (id) {
+    const inp = document.getElementById(id);
+    if (inp && inp.type !== 'password') togglePwField(id, inp.parentNode.querySelector('.lg-peek'));
+  });
   document.getElementById('pwGateError').style.display = 'none';
   document.getElementById('pwGateNew').focus();
 }
@@ -406,6 +443,7 @@ async function changePassword() {
 // unnecessary now: the browser leaves this page entirely, and index.html
 // loads with its form already blank.
 function doLogout() {
+  _stopAccountWatch();   // before signOut, or the watcher reads it as a removal
   currentStudent = null;
   mySubjects     = [];
   myEvals        = [];
@@ -493,7 +531,7 @@ async function restoreSession() {
         if (!IS_DASHBOARD) { goToDashboard(); return; }
         _hideRestoreRetry();
         _clearHops();
-        initApp(false);
+        _startApp(false, 'teachers', read.doc.id);
         return;
       }
     } else if (!data.deleted) {
@@ -504,7 +542,7 @@ async function restoreSession() {
       // then still wins.
       _hideRestoreRetry();
       _clearHops();
-      initApp(data.status !== 'active');
+      _startApp(data.status !== 'active', 'students', read.doc.id);
       return;
     }
   }
@@ -580,6 +618,7 @@ async function _readRosterDoc(collection, docId) {
 // Full-page "cannot reach the server" state, with Retry. Built here rather than
 // in dashboard.html so the dashboard markup does not have to change.
 function _showRestoreRetry(err) {
+  hideSplash();
   let box = document.getElementById('restoreRetry');
   if (!box) {
     box = document.createElement('div');
@@ -613,14 +652,107 @@ function _hideRestoreRetry() {
   if (box) box.remove();
 }
 
+// ============================================================
+// START THE DASHBOARD + WATCH THE ACCOUNT
+// ------------------------------------------------------------
+// _startApp runs the dashboard, fades the loading splash once the
+// first screen is drawn, and starts watching the person's own record.
+//
+// The watch is what signs someone out when the admin deletes them
+// WHILE the portal is open. Session restore already refused a deleted
+// account on page load, but a person who stayed on the page kept
+// using it. Now:
+//   - deleted, or the record is gone       -> signed out, with the reason
+//   - supervisor deactivated or demoted    -> signed out (restore refuses
+//                                              those too)
+//   - student deactivated / reactivated    -> the page reloads into (or
+//                                              out of) the read-only
+//                                              "inactive" mode the portal
+//                                              already has
+// Only answers from the SERVER count. A cached copy or a dropped
+// connection never signs anyone out.
+// ============================================================
+let _accountUnsub = null;
+
+function _startApp(isInactive, collection, docId) {
+  Promise.resolve()
+    .then(function () { return initApp(isInactive); })
+    .catch(function (e) { console.error('The dashboard failed to start:', e); })
+    .then(hideSplash);
+  _watchMyAccount(collection, docId, isInactive);
+}
+
+function _stopAccountWatch() {
+  if (_accountUnsub) { try { _accountUnsub(); } catch (e) {} _accountUnsub = null; }
+}
+
+const _MSG_REMOVED = 'This account has been removed. Contact the evaluation office.';
+
+function _watchMyAccount(collection, docId, startedInactive) {
+  _stopAccountWatch();
+  if (!docId) return;
+  const isSupervisor = collection === 'teachers';
+
+  _accountUnsub = db.collection(collection).doc(docId).onSnapshot(function (snap) {
+    if (!fbAuth.currentUser) return;          // signing out on purpose
+    if (snap.metadata.fromCache) return;      // wait for the server's answer
+    if (!snap.exists) return _forcedSignOut(_MSG_REMOVED);
+
+    const d = snap.data() || {};
+    if (d.deleted) return _forcedSignOut(_MSG_REMOVED);
+
+    if (isSupervisor) {
+      if (d.facultyType !== 'supervisor')
+        return _forcedSignOut('This account is no longer set up as a supervisor.');
+      if ((d.status || 'active') !== 'active')
+        return _forcedSignOut('This supervisor account is inactive. Contact the evaluation office.');
+      return;
+    }
+
+    const inactiveNow = (d.status || 'active') !== 'active';
+    if (inactiveNow !== !!startedInactive) {
+      _stopAccountWatch();
+      location.reload();                      // session restore applies the new mode
+    }
+  }, function (err) {
+    if (!fbAuth.currentUser) return;
+    // The rules refuse a student's read once the record is gone or no longer
+    // carries their ID - that is an answer, not a network problem.
+    if (err && err.code === 'permission-denied') _forcedSignOut(_MSG_REMOVED);
+    else console.warn('Account watch stopped:', err && (err.code || err.message));
+  });
+}
+
+// Like doLogout, but tells the person why on the login page.
+function _forcedSignOut(reason) {
+  _stopAccountWatch();
+  currentStudent = null;
+  try {
+    sessionStorage.removeItem('studentSession');
+    sessionStorage.removeItem('studentInactive');
+  } catch (e) {}
+  _clearHops();
+  const go = function () { goToLogin(reason); };
+  fbAuth.signOut().catch(function () {}).then(go, go);
+}
+
 // Run only once every script on the page has parsed.
 //
 // app.js loads AFTER this file, so calling initApp() the moment auth.js
 // executes can hit a ReferenceError - and the catch above would read that
 // as an unusable session and bounce a perfectly good login back to
 // index.html. Waiting for load removes the race entirely.
+// On the login page the splash stays up only while a saved sign-in is being
+// checked; if the person has to sign in, it fades as soon as that is known.
+// (A redirect to the dashboard leaves it up - the dashboard shows its own.)
+function _runRestore() {
+  Promise.resolve()
+    .then(restoreSession)
+    .catch(function (e) { console.error('Session restore failed:', e); })
+    .then(function () { if (!IS_DASHBOARD && !window._leavingPage) hideSplash(); });
+}
 if (document.readyState === 'complete') {
-  restoreSession();
+  _runRestore();
 } else {
-  window.addEventListener('load', restoreSession);
+  window.addEventListener('load', _runRestore);
 }
