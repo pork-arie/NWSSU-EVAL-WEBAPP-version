@@ -289,11 +289,24 @@ async function initApp(isInactive = false) {
   showPage('dashboard');
 }
 
+// The departments this supervisor oversees - the ones the admin assigned
+// (supervisedDepts). The HOME department is no longer added automatically:
+// a CCIS teacher who is Dean of COED teaches in CCIS but supervises only
+// COED, so she must not be able to rate CCIS faculty. Older records with
+// no supervisedDepts list still fall back to the home department.
 function supervisedDeptsOf(person) {
-  const home = (person && person.dept || '').trim();
   const extra = Array.isArray(person && person.supervisedDepts) ? person.supervisedDepts : [];
-  const list = [home].concat(extra.map(d => (d && d.dept || '').trim()));
-  return list.filter((d, i) => d && list.indexOf(d) === i);   // non-empty, de-duplicated, home first
+  const list = extra.map(d => (d && d.dept || '').trim());
+  if (!list.filter(Boolean).length) list.push((person && person.dept || '').trim());
+  return list.filter((d, i) => d && list.indexOf(d) === i);   // non-empty, de-duplicated
+}
+
+// Is this teacher rated as FACULTY in their home department? Regular faculty
+// always; a supervisor only when they supervise somewhere OTHER than home
+// (the Dean of COED who teaches in CCIS is CCIS faculty; the CCIS chair is not).
+function teachesInHomeDept(t) {
+  if ((t.facultyType || 'regular') !== 'supervisor') return true;
+  return supervisedDeptsOf(t).indexOf((t.dept || '').trim()) === -1;
 }
 
 // Faculty across every department this supervisor chairs (CMO 9.2, 9.3).
@@ -305,7 +318,8 @@ async function loadSupervisorData() {
   snap.forEach(doc => {
     const t = doc.data();
     if (t.deleted) return;
-    if ((t.facultyType || 'regular') === 'supervisor') return;   // exclude other supervisors
+    if (doc.id === currentStudent.docId) return;                 // never yourself
+    if (!teachesInHomeDept(t)) return;                           // other supervisors, unless they teach here
     if (myDepts.indexOf((t.dept || '').trim()) === -1) return;   // any department they oversee
     deptFaculty.push({ ...t, docId: doc.id });
   });
