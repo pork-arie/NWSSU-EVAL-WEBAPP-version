@@ -1,0 +1,22 @@
+{
+  "name": "nwssu-promo-video",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Promotional video for the NwSSU Faculty Evaluation System, built with Remotion",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render NwssuPromo out/nwssu-promo-90s.mp4",
+    "render:short": "remotion render NwssuShort out/nwssu-promo-30s-vertical.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.533",
+    "@remotion/fonts": "4.0.533",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.533"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "typescript": "^7.0.2"
+  }
+}
